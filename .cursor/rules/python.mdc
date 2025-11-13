@@ -1,0 +1,120 @@
+---
+alwaysApply: true
+---
+
+# Python Development Rules
+
+## Code Style and Formatting
+
+- Follow PEP 8 style guidelines with the following project-specific overrides:
+  - Line length: 100 characters (configured in pyproject.toml)
+  - Use type hints for function parameters and return values when possible
+  - Use `Optional[Type]` or `Type | None` for nullable types (Python 3.10+)
+  - Prefer f-strings for string formatting
+
+## Project Structure
+
+- Main package code goes in `nightowl/` directory
+- Tests go in `tests/` directory with matching structure
+- Test files should be named `test_*.py`
+- Test classes should be named `Test*`
+- Test functions should be named `test_*`
+
+## Dependencies
+
+- Runtime dependencies are defined in `pyproject.toml` under `[project.dependencies]`
+- Development dependencies are under `[project.optional-dependencies.dev]`
+- Always specify minimum versions (e.g., `requests>=2.31.0`)
+- Use `pip install -e .[dev]` for development installation
+
+## Testing
+
+- Use pytest for all tests
+- Write tests for all new functionality
+- Aim for high test coverage (run `pytest --cov=nightowl`)
+- Use `unittest.mock` for mocking external dependencies
+- Test files should be in `tests/` directory mirroring package structure
+
+## Code Quality
+
+- Run `ruff check` before committing (configured in pyproject.toml)
+- Run `black` for code formatting (configured in pyproject.toml)
+- Run `mypy` for type checking (configured in pyproject.toml)
+- Use `make format` to auto-format code
+- Use `make lint` to check code quality
+
+## Error Handling
+
+- Use specific exception types (e.g., `OuraAPIError` for API errors)
+- Include meaningful error messages
+- Log errors appropriately using the logging module
+- Use `raise ... from ...` to preserve exception chains
+
+## Logging
+
+- Use the `logging` module, not `print()` statements
+- Configure logging in CLI entrypoint with `setup_logging()`
+- Use appropriate log levels: DEBUG, INFO, WARNING, ERROR
+- Include context in log messages
+
+## API Client Patterns
+
+- API clients should inherit from a base pattern (see `nightowl/api.py`)
+- Handle authentication via environment variables or constructor parameters
+- Use `requests` library for HTTP calls
+- Always set timeouts on HTTP requests
+- Raise custom exceptions for API errors
+- Include proper error handling and logging
+
+## CSV Storage Patterns
+
+- Use the `csv` module for CSV operations
+- Implement duplicate detection based on date/primary key
+- Support both append and overwrite modes
+- Flatten nested data structures for CSV storage
+- Handle missing fields gracefully
+
+## CLI Patterns
+
+- Use `argparse` for command-line arguments
+- Provide sensible defaults
+- Validate input (e.g., date formats)
+- Return exit codes (0 for success, non-zero for errors)
+- Use `sys.exit(main())` pattern in entry point scripts
+
+## Security
+
+- Never hardcode secrets or API keys
+- Use environment variables for sensitive configuration
+- Validate and sanitize user input
+- Use `requests` with proper timeout settings
+- Follow security best practices from Snyk scans
+
+## Documentation
+
+- Use docstrings for all public functions, classes, and modules
+- Follow Google-style docstrings or NumPy-style
+- Include type information in docstrings when helpful
+- Update README.md when adding new features or changing usage
+
+## Import Organization
+
+- Standard library imports first
+- Third-party imports second
+- Local application imports last
+- Use absolute imports within the package
+- Group imports with blank lines between groups
+
+## Type Hints
+
+- Use type hints for function signatures
+- Use `typing` module for complex types (List, Dict, Optional, etc.)
+- Use `from __future__ import annotations` for forward references if needed
+- Type hints are encouraged but not strictly required (mypy configured with `disallow_untyped_defs = false`)
+
+## File Organization
+
+- Keep files focused on a single responsibility
+- Separate API client logic from storage logic
+- Separate CLI logic from business logic
+- Use classes for stateful operations, functions for stateless operations

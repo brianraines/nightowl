@@ -1,0 +1,169 @@
+---
+alwaysApply: true
+---
+# Python Development Commands
+
+## Setup and Installation
+
+### Install Development Environment
+```bash
+make install-dev
+```
+Installs the package in editable mode with all development dependencies (pytest, black, ruff, mypy).
+
+### Install Runtime Only
+```bash
+make install
+```
+Installs the package in editable mode with only runtime dependencies.
+
+## Code Quality
+
+### Format Code
+```bash
+make format
+```
+Runs black formatter and ruff auto-fix on all Python files.
+
+### Lint Code
+```bash
+make lint
+```
+Runs ruff linter and mypy type checker on the codebase.
+
+### Run Tests
+```bash
+make test
+```
+Runs pytest with coverage reporting.
+
+### Run Tests with Coverage Report
+```bash
+pytest --cov=nightowl --cov-report=html
+```
+Generates HTML coverage report in `htmlcov/` directory.
+
+## Development Workflow
+
+### Run the Application
+```bash
+make run
+```
+Runs the CLI script to pull sleep data (requires OURA_ACCESS_TOKEN environment variable).
+
+### Run CLI Directly
+```bash
+./nightowl.py --days 7
+```
+Run the CLI directly as an executable script, or use `python nightowl.py --days 7` if preferred.
+
+### Run as Module
+```bash
+python -m nightowl --days 7
+```
+Run the CLI using Python module entrypoint.
+
+### Run Installed Script
+```bash
+nightowl --days 7
+```
+Run the CLI using the installed console script (after `make install`).
+
+## Testing Commands
+
+### Run Specific Test File
+```bash
+pytest tests/test_api.py
+```
+
+### Run Specific Test
+```bash
+pytest tests/test_api.py::TestOuraAPIClient::test_init_with_token
+```
+
+### Run Tests with Verbose Output
+```bash
+pytest -v
+```
+
+### Run Tests with Debug Output
+```bash
+pytest --log-cli-level=DEBUG
+```
+
+## Code Generation
+
+### Create New Module
+When creating a new module in `nightowl/`:
+1. Create the Python file with proper docstrings
+2. Add type hints to functions
+3. Add corresponding test file in `tests/`
+4. Update `__init__.py` if exporting public API
+5. Update README.md if adding new features
+
+### Create New Test
+When creating a new test:
+1. Create test file in `tests/` directory
+2. Name it `test_<module_name>.py`
+3. Use `Test*` class names
+4. Use `test_*` function names
+5. Follow existing test patterns with mocking
+
+## Cleanup
+
+### Clean Build Artifacts
+```bash
+make clean
+```
+Removes all build artifacts, cache files, and compiled Python files.
+
+## Environment Setup
+
+### Set Oura API Token
+```bash
+export OURA_ACCESS_TOKEN="your-token-here"
+```
+
+### Create Virtual Environment
+```bash
+python3 -m venv .venv
+source .venv/bin/activate  # On macOS/Linux
+```
+
+### Upgrade pip
+```bash
+pip install --upgrade pip
+```
+
+## Debugging
+
+### Run with Debug Logging
+```bash
+python nightowl.py --debug
+```
+
+### Check Python Version
+```bash
+python --version
+```
+
+### Verify Installation
+```bash
+pip list | grep nightowl
+```
+
+## Git Workflow
+
+### Before Committing
+1. Run `make format` to format code
+2. Run `make lint` to check for issues
+3. Run `make test` to ensure tests pass
+4. Check for security issues (Snyk scan if configured)
+
+### Commit Message Format
+Use descriptive commit messages:
+- `feat: add new feature`
+- `fix: fix bug`
+- `test: add tests`
+- `docs: update documentation`
+- `refactor: refactor code`
