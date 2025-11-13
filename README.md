@@ -88,7 +88,7 @@ nightowl --days 7
 * `-s`, `--start-date`: Start date in YYYY-MM-DD format. Defaults to `--days` days ago when omitted.
 * `-e`, `--end-date`: End date in YYYY-MM-DD format. Defaults to today when omitted.
 * `-d`, `--days`: Number of days to fetch if dates not specified. Defaults to `7`.
-* `-o`, `--output`: Path to CSV output file. Defaults to `exports/sleep_data.csv`.
+* `-o`, `--output`: Path to CSV output file. Defaults to `exports/data/sleep_data.csv`.
 * `--overwrite`: Overwrite existing CSV file instead of appending.
 * `--debug`: Enable debug logging.
 
@@ -116,11 +116,13 @@ Overwrite existing file:
 ./nightowl.py --overwrite
 ```
 
+
 ## CSV Output Format
 
 The CSV file includes the following fields (when available):
 
 * `date` - Date of the sleep record (YYYY-MM-DD)
+* `is_nap` - Flag indicating if this is a nap (1) or regular sleep (0). Naps are sleep sessions shorter than 3 hours (10800 seconds).
 * `score` - Overall sleep score
 * `total_sleep_duration` - Total sleep duration in seconds
 * `total_sleep_time` - Total sleep time in seconds
@@ -139,7 +141,17 @@ The CSV file includes the following fields (when available):
 
 ## Dashboard
 
-After saving sleep data, NightOwl automatically generates an interactive HTML dashboard using Plotly. The dashboard includes:
+After saving sleep data, NightOwl automatically generates all available interactive HTML dashboards using Plotly. Dashboards are saved in the `exports/dashboards/` directory with names like `default_dashboard.html` and `deep_sleep_dashboard.html`. Each dashboard includes breadcrumb navigation links to easily switch between different views. Open any dashboard in your web browser to explore your sleep data interactively.
+
+**Note**: All dashboards automatically filter out naps (sleep sessions shorter than 3 hours) to prevent them from polluting sleep analysis. Naps are still saved in the CSV with the `is_nap` flag set to 1.
+
+### Dashboard Templates
+
+NightOwl automatically generates all available dashboard templates:
+
+#### Default Dashboard
+
+The default dashboard includes:
 
 * **Total Sleep Duration** - Time series showing sleep duration trends over time
 * **Sleep Stages Breakdown** - Average distribution of deep, REM, and light sleep
@@ -148,7 +160,24 @@ After saving sleep data, NightOwl automatically generates an interactive HTML da
 * **Breathing Rate** - Average breathing rate trends
 * **Time in Bed vs Sleep** - Comparison of time in bed vs actual sleep duration
 
-The dashboard is saved as `exports/nightowl_dashboard.html`. Open it in any web browser to explore your sleep data interactively.
+#### Deep Sleep Dashboard
+
+The deep sleep focused dashboard provides detailed analysis of deep sleep patterns. **Note**: Naps (sleep sessions shorter than 3 hours) are automatically filtered out to prevent polluting the deep sleep analysis:
+
+* **Deep Sleep Duration Trend** - Time series with average line
+* **Deep Sleep Percentage** - Percentage of total sleep with recommended range (15-20%)
+* **Deep Sleep vs Other Stages** - Stacked bar chart comparing all sleep stages
+* **Deep Sleep vs Heart Rate** - Correlation scatter plot
+* **Deep Sleep vs HRV** - Correlation scatter plot
+* **Deep Sleep Efficiency** - Deep sleep as percentage of time in bed
+
+All dashboards are generated automatically when you run the script. Use the breadcrumb navigation at the top of each dashboard to switch between views.
+
+#### Interactive Features
+
+* **Date Range Filtering** - Each dashboard includes date range pickers at the top. Select a start and end date, then click "Apply Filter" to filter all charts to that date range. Click "Reset" to restore the full date range.
+* **Modern UI** - Dashboards feature a modern, gradient-based design with smooth animations, rounded corners, and a clean layout. Charts are displayed in white cards with subtle shadows for better visual hierarchy.
+* **Breadcrumb Navigation** - Easily switch between dashboard templates using the navigation links at the top of each page.
 
 **Note**: Dashboard generation requires `plotly` and `pandas`, which are included in the default installation. If these are not available, the script will continue without generating a dashboard.
 
@@ -216,8 +245,11 @@ nightowl/
 │   ├── test_api.py
 │   └── test_storage.py
 ├── exports/                      # Exported data directory (gitignored)
-│   ├── sleep_data.csv            # Sleep data CSV file
-│   └── nightowl_dashboard.html   # Interactive dashboard
+│   ├── data/                     # CSV data files
+│   │   └── sleep_data.csv        # Sleep data CSV file
+│   └── dashboards/               # Dashboard HTML files
+│       ├── default_dashboard.html
+│       └── deep_sleep_dashboard.html
 ├── nightowl.py        # Entry point script
 ├── pyproject.toml     # Project configuration
 ├── Makefile           # Build and test tasks
