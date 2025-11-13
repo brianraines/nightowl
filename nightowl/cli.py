@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 from nightowl.api import OuraAPIClient, OuraAPIError
-from nightowl.storage import SleepDataStorage
+from nightowl.storage import OuraDataStorage
 from nightowl.dashboard import create_all_dashboards
 
 logger = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ def parse_date(date_str: str) -> str:
 def main() -> int:
     """Main CLI entrypoint."""
     parser = argparse.ArgumentParser(
-        description="Pull sleep data from the Oura API and persist to CSV"
+        description="Pull all available data from the Oura API and persist to CSV"
     )
     parser.add_argument(
         "-s",
@@ -73,8 +73,8 @@ def main() -> int:
     parser.add_argument(
         "-o",
         "--output",
-        default="exports/data/sleep_data.csv",
-        help="Path to CSV output file (default: exports/data/sleep_data.csv)",
+        default="exports/data",
+        help="Base directory for CSV output files (default: exports/data)",
     )
     parser.add_argument(
         "--overwrite",
@@ -95,25 +95,35 @@ def main() -> int:
         # Initialize API client
         client = OuraAPIClient()
 
-        # Fetch sleep data
-        logger.info("Fetching sleep data from Oura API...")
-        sleep_data = client.fetch_sleep_data(
+        # Fetch all available data
+        logger.info("Fetching all available data from Oura API...")
+        all_data = client.fetch_all_data(
             start_date=args.start_date,
             end_date=args.end_date,
             days=args.days,
         )
 
-        if not sleep_data:
-            logger.warning("No sleep data returned from API")
+        if not any(all_data.values()):
+            logger.warning("No data returned from API")
             return 0
 
-        logger.info(f"Retrieved {len(sleep_data)} sleep records")
+        # Initialize storage
+        storage = OuraDataStorage(base_dir=args.output)
+        total_saved = 0
 
-        # Save to CSV
-        storage = SleepDataStorage(csv_path=args.output)
-        saved_count = storage.save(sleep_data, append=not args.overwrite)
+        # Save each data type to its own CSV file
+        for data_type, data_list in all_data.items():
+            if data_list:
+                logger.info(f"Saving {data_type} data...")
+                saved_count = storage.save(
+                    data_list,
+                    data_type=data_type,
+                    append=not args.overwrite,
+                )
+                total_saved += saved_count
+                logger.info(f"Saved {saved_count} new {data_type} records")
 
-        logger.info(f"Successfully saved {saved_count} new records")
+        logger.info(f"Successfully saved {total_saved} total new records")
 
         # Generate all dashboards
         try:
