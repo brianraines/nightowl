@@ -4,11 +4,12 @@ import argparse
 import logging
 import sys
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Optional
 
 from nightowl.api import OuraAPIClient, OuraAPIError
 from nightowl.storage import SleepDataStorage
-from nightowl.dashboard import create_dashboard
+from nightowl.dashboard import create_all_dashboards
 
 logger = logging.getLogger(__name__)
 
@@ -72,8 +73,8 @@ def main() -> int:
     parser.add_argument(
         "-o",
         "--output",
-        default="exports/sleep_data.csv",
-        help="Path to CSV output file (default: exports/sleep_data.csv)",
+        default="exports/data/sleep_data.csv",
+        help="Path to CSV output file (default: exports/data/sleep_data.csv)",
     )
     parser.add_argument(
         "--overwrite",
@@ -114,10 +115,13 @@ def main() -> int:
 
         logger.info(f"Successfully saved {saved_count} new records")
 
-        # Generate dashboard
+        # Generate all dashboards
         try:
-            dashboard_path = create_dashboard(args.output)
-            logger.info(f"Dashboard generated: {dashboard_path}")
+            dashboard_paths = create_all_dashboards(args.output)
+            logger.info(
+                f"Generated {len(dashboard_paths)} dashboard(s): "
+                + ", ".join([Path(p).name for p in dashboard_paths])
+            )
         except ImportError as e:
             logger.warning(
                 f"Dashboard generation skipped: {e}. "

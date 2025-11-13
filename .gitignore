@@ -146,6 +146,8 @@ venv.bak/
 
 # Exported data files
 exports/
+exports/data/
+exports/dashboards/
 
 # Spyder project settings
 .spyderproject

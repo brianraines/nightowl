@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class SleepDataStorage:
     """Manages CSV storage for sleep data."""
 
-    def __init__(self, csv_path: str = "exports/sleep_data.csv"):
+    def __init__(self, csv_path: str = "exports/data/sleep_data.csv"):
         """
         Initialize the storage handler.
 
@@ -44,6 +44,24 @@ class SleepDataStorage:
             logger.warning(f"Error reading existing CSV: {e}")
         return existing_dates
 
+    def _is_nap(self, record: Dict) -> bool:
+        """
+        Determine if a sleep record is a nap.
+
+        Naps are typically shorter than regular sleep. Using 3 hours (10800 seconds)
+        as the threshold - sleep sessions shorter than this are considered naps.
+
+        Args:
+            record: Sleep record from Oura API.
+
+        Returns:
+            True if the record is a nap, False otherwise.
+        """
+        total_sleep = record.get("total_sleep_duration", 0)
+        # 3 hours = 10800 seconds
+        # Sleep sessions shorter than 3 hours are considered naps
+        return total_sleep > 0 and total_sleep < 10800
+
     def _flatten_sleep_record(self, record: Dict) -> Dict:
         """
         Flatten a nested sleep record into a flat dictionary.
@@ -55,6 +73,9 @@ class SleepDataStorage:
             Flattened dictionary suitable for CSV storage.
         """
         flattened = {"date": record.get("day")}
+
+        # Detect and flag naps
+        flattened["is_nap"] = 1 if self._is_nap(record) else 0
 
         # Extract top-level fields
         for key in [
@@ -134,9 +155,11 @@ class SleepDataStorage:
             except Exception:
                 pass
 
-        # Combine fieldnames, ensuring 'date' is first
+        # Combine fieldnames, ensuring 'date' and 'is_nap' are first
         all_fieldnames = existing_fieldnames | all_fieldnames
-        fieldnames = ["date"] + sorted([f for f in all_fieldnames if f != "date"])
+        priority_fields = ["date", "is_nap"]
+        other_fields = sorted([f for f in all_fieldnames if f not in priority_fields])
+        fieldnames = priority_fields + other_fields
 
         # Write records
         file_exists = self.csv_path.exists() and append
