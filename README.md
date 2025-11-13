@@ -1,6 +1,6 @@
 # NightOwl
 
-Pull sleep data from the Oura API and persist it to CSV over time.
+Pull sleep data from the Oura API and persist it to CSV over time, and display in a Plotty Dashboard.
 
 ## Features
 
