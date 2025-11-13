@@ -1,12 +1,14 @@
 # NightOwl
 
-Pull sleep data from the Oura API and persist it to CSV over time.
+Pull all available data from the Oura API and persist it to CSV over time, with interactive dashboards for visualization.
 
 ## Features
 
-* Consistent CLI for fetching sleep data from the Oura API
-* Automatic CSV persistence with duplicate detection
+* Comprehensive data collection from available Oura API v2 endpoints (sleep, heart rate, sessions, workouts, tags, SpO2)
+* Automatic CSV persistence with duplicate detection for each data type
 * Interactive HTML dashboard generation with Plotly
+* Multiple dashboard templates: default sleep analysis, deep sleep focus, and heart health
+* Date range filtering and modern UI design
 * Configurable date ranges and output paths
 * Simple API client abstraction ready for extension
 
@@ -88,38 +90,51 @@ nightowl --days 7
 * `-s`, `--start-date`: Start date in YYYY-MM-DD format. Defaults to `--days` days ago when omitted.
 * `-e`, `--end-date`: End date in YYYY-MM-DD format. Defaults to today when omitted.
 * `-d`, `--days`: Number of days to fetch if dates not specified. Defaults to `7`.
-* `-o`, `--output`: Path to CSV output file. Defaults to `exports/data/sleep_data.csv`.
+* `-o`, `--output`: Base directory for CSV output files. Defaults to `exports/data`. Each data type is saved to its own CSV file (e.g., `sleep_data.csv`, `heartrate_data.csv`).
 * `--overwrite`: Overwrite existing CSV file instead of appending.
 * `--debug`: Enable debug logging.
 
 ### Examples
 
-Fetch the last 7 days of sleep data:
+Fetch the last 7 days of all available data:
 ```bash
 make run
 # or
-./nightowl.py
+./nightowl.py --days 7
 ```
 
-Fetch a specific date range:
+Fetch all data for a specific date range:
 ```bash
 ./nightowl.py --start-date 2024-01-01 --end-date 2024-01-31
 ```
 
-Fetch last 30 days and save to custom location:
+Fetch last 30 days and save to custom directory:
 ```bash
-./nightowl.py --days 30 --output exports/my_sleep.csv
+./nightowl.py --days 30 --output exports/my_data
 ```
 
-Overwrite existing file:
+Fetch all data and overwrite existing CSV files:
 ```bash
-./nightowl.py --overwrite
+./nightowl.py --days 30 --overwrite
 ```
 
+
+## Data Storage
+
+All Oura data is persisted to separate CSV files in the `exports/data/` directory. Each data type has its own CSV file:
+
+* `sleep_data.csv` - Sleep data including duration, stages, heart rate, HRV, etc.
+* `heartrate_data.csv` - Heart rate data including resting HR, HRV, zones, etc.
+* `session_data.csv` - Workout and activity session data
+* `workout_data.csv` - Detailed workout information
+* `tag_data.csv` - User-created tags and notes
+* `spo2_data.csv` - SpO2 (blood oxygen saturation) levels recorded during sleep
+
+All CSV files use dynamic headers based on available fields, ensuring compatibility with evolving API responses. Duplicate dates are automatically detected and skipped when appending.
 
 ## CSV Output Format
 
-The CSV file includes the following fields (when available):
+The sleep CSV file includes the following fields (when available):
 
 * `date` - Date of the sleep record (YYYY-MM-DD)
 * `is_nap` - Flag indicating if this is a nap (1) or regular sleep (0). Naps are sleep sessions shorter than 3 hours (10800 seconds).
@@ -170,6 +185,17 @@ The deep sleep focused dashboard provides detailed analysis of deep sleep patter
 * **Deep Sleep vs Heart Rate** - Correlation scatter plot
 * **Deep Sleep vs HRV** - Correlation scatter plot
 * **Deep Sleep Efficiency** - Deep sleep as percentage of time in bed
+
+#### Heart Health Dashboard
+
+The heart health dashboard provides comprehensive analysis of cardiovascular metrics. Requires heart rate data (`heartrate_data.csv`):
+
+* **Resting Heart Rate Trend** - Daily resting heart rate with average line
+* **Heart Rate Variability (HRV)** - HRV trends over time
+* **Heart Rate Zones Distribution** - Time spent in each heart rate zone (Recovery, Aerobic, Anaerobic, Max)
+* **Daily Heart Rate Range** - Lowest and highest heart rate each day
+* **Heart Rate Recovery** - Post-exercise heart rate recovery metrics (if available)
+* **Heart Rate Visualization** - Color-coded resting heart rate scatter plot
 
 All dashboards are generated automatically when you run the script. Use the breadcrumb navigation at the top of each dashboard to switch between views.
 

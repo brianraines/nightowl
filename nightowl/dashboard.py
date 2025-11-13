@@ -53,6 +53,50 @@ def load_sleep_data(csv_path: str) -> pd.DataFrame:
     return df
 
 
+def load_heartrate_data(csv_path: str) -> pd.DataFrame:
+    """
+    Load heart rate data from CSV file.
+
+    Args:
+        csv_path: Path to CSV file.
+
+    Returns:
+        DataFrame with heart rate data.
+    """
+    df = pd.read_csv(csv_path)
+    df["date"] = pd.to_datetime(df["date"])
+    df = df.sort_values("date")
+    return df
+
+
+def load_multiple_data_types(base_dir: str = "exports/data") -> Dict[str, pd.DataFrame]:
+    """
+    Load multiple data types from CSV files.
+
+    Args:
+        base_dir: Base directory containing CSV files.
+
+    Returns:
+        Dictionary mapping data type names to DataFrames.
+    """
+    data = {}
+    base_path = Path(base_dir)
+
+    for data_type in ["sleep", "heartrate"]:
+        csv_path = base_path / f"{data_type}_data.csv"
+        if csv_path.exists():
+            try:
+                df = pd.read_csv(csv_path)
+                if "date" in df.columns:
+                    df["date"] = pd.to_datetime(df["date"])
+                    df = df.sort_values("date")
+                    data[data_type] = df
+            except Exception as e:
+                logger.warning(f"Failed to load {data_type} data: {e}")
+
+    return data
+
+
 @register_template("default")
 def create_default_dashboard(df: pd.DataFrame) -> go.Figure:
     """
@@ -575,6 +619,244 @@ def create_deep_sleep_dashboard(df: pd.DataFrame) -> go.Figure:
     return fig
 
 
+@register_template("heart_health")
+def create_heart_health_dashboard(df: pd.DataFrame) -> go.Figure:
+    """
+    Create a heart health focused dashboard.
+
+    Args:
+        df: DataFrame with heart rate data (time-series with bpm, source, timestamp).
+
+    Returns:
+        Plotly figure object.
+    """
+    if len(df) == 0:
+        logger.warning("No heart rate data available")
+        fig = go.Figure()
+        fig.add_annotation(
+            text="No heart rate data available",
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font=dict(size=16),
+        )
+        return fig
+
+    # Convert timestamp to datetime if it's a string
+    if "timestamp" in df.columns:
+        df["timestamp"] = pd.to_datetime(df["timestamp"])
+        df = df.sort_values("timestamp")
+
+    # Aggregate time-series data by date for daily summaries
+    if "date" in df.columns and "bpm" in df.columns:
+        daily_stats = df.groupby("date").agg({
+            "bpm": ["mean", "min", "max", "std"],
+        }).reset_index()
+        daily_stats.columns = ["date", "avg_bpm", "min_bpm", "max_bpm", "std_bpm"]
+        daily_stats["date"] = pd.to_datetime(daily_stats["date"])
+
+        # Calculate resting HR (lowest values, typically during rest periods)
+        if "source" in df.columns:
+            rest_data = df[df["source"] == "rest"]
+            if len(rest_data) > 0:
+                daily_rest = rest_data.groupby("date")["bpm"].min().reset_index()
+                daily_rest.columns = ["date", "resting_hr"]
+                daily_rest["date"] = pd.to_datetime(daily_rest["date"])
+                daily_stats = daily_stats.merge(daily_rest, on="date", how="left")
+            else:
+                daily_stats["resting_hr"] = daily_stats["min_bpm"]
+        else:
+            daily_stats["resting_hr"] = daily_stats["min_bpm"]
+    else:
+        logger.warning("Heart rate data missing required columns (date, bpm)")
+        fig = go.Figure()
+        fig.add_annotation(
+            text="Heart rate data missing required columns",
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font=dict(size=16),
+        )
+        return fig
+
+    # Create subplots
+    fig = make_subplots(
+        rows=3,
+        cols=2,
+        subplot_titles=(
+            "Resting Heart Rate Trend",
+            "Heart Rate Over Time",
+            "Daily Heart Rate Range",
+            "Heart Rate by Source",
+            "Heart Rate Distribution",
+            "Heart Rate Variability",
+        ),
+        specs=[
+            [{"type": "scatter"}, {"type": "scatter"}],
+            [{"type": "scatter"}, {"type": "bar"}],
+            [{"type": "histogram"}, {"type": "scatter"}],
+        ],
+        vertical_spacing=0.12,
+        horizontal_spacing=0.1,
+    )
+
+    # 1. Resting Heart Rate Trend
+    if "resting_hr" in daily_stats.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=daily_stats["date"],
+                y=daily_stats["resting_hr"],
+                mode="lines+markers",
+                name="Resting HR",
+                line=dict(color="#e74c3c", width=2),
+                marker=dict(size=6),
+            ),
+            row=1,
+            col=1,
+        )
+        # Add average line
+        avg_hr = daily_stats["resting_hr"].mean()
+        fig.add_hline(
+            y=avg_hr,
+            line_dash="dash",
+            line_color="gray",
+            annotation_text=f"Avg: {avg_hr:.1f} BPM",
+            row=1,
+            col=1,
+        )
+
+    # 2. Heart Rate Over Time (time-series)
+    if "timestamp" in df.columns and "bpm" in df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df["timestamp"],
+                y=df["bpm"],
+                mode="lines",
+                name="Heart Rate",
+                line=dict(color="#3498db", width=1),
+                opacity=0.6,
+            ),
+            row=1,
+            col=2,
+        )
+
+    # 3. Daily Heart Rate Range
+    if "min_bpm" in daily_stats.columns and "max_bpm" in daily_stats.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=daily_stats["date"],
+                y=daily_stats["min_bpm"],
+                mode="lines+markers",
+                name="Min HR",
+                line=dict(color="#2ecc71", width=2),
+                marker=dict(size=5),
+                fill=None,
+            ),
+            row=2,
+            col=1,
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=daily_stats["date"],
+                y=daily_stats["max_bpm"],
+                mode="lines+markers",
+                name="Max HR",
+                line=dict(color="#e74c3c", width=2),
+                marker=dict(size=5),
+                fill="tonexty",
+                fillcolor="rgba(231, 76, 60, 0.2)",
+            ),
+            row=2,
+            col=1,
+        )
+
+    # 4. Heart Rate by Source
+    if "source" in df.columns:
+        source_counts = df.groupby("source")["bpm"].count().reset_index()
+        source_counts.columns = ["source", "count"]
+        fig.add_trace(
+            go.Bar(
+                x=source_counts["source"],
+                y=source_counts["count"],
+                name="Measurements by Source",
+                marker_color="#9b59b6",
+            ),
+            row=2,
+            col=2,
+        )
+
+    # 5. Heart Rate Distribution
+    if "bpm" in df.columns:
+        fig.add_trace(
+            go.Histogram(
+                x=df["bpm"],
+                nbinsx=30,
+                name="HR Distribution",
+                marker_color="#f39c12",
+            ),
+            row=3,
+            col=1,
+        )
+
+    # 6. Average Heart Rate Trend
+    if "avg_bpm" in daily_stats.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=daily_stats["date"],
+                y=daily_stats["avg_bpm"],
+                mode="lines+markers",
+                name="Avg HR",
+                line=dict(color="#e67e22", width=2),
+                marker=dict(size=6),
+            ),
+            row=3,
+            col=2,
+        )
+
+    # Update axes labels
+    fig.update_xaxes(title_text="Date", row=1, col=1)
+    fig.update_xaxes(title_text="Time", row=1, col=2)
+    fig.update_xaxes(title_text="Date", row=2, col=1)
+    fig.update_xaxes(title_text="Source", row=2, col=2)
+    fig.update_xaxes(title_text="Heart Rate (BPM)", row=3, col=1)
+    fig.update_xaxes(title_text="Date", row=3, col=2)
+
+    fig.update_yaxes(title_text="BPM", row=1, col=1)
+    fig.update_yaxes(title_text="BPM", row=1, col=2)
+    fig.update_yaxes(title_text="BPM", row=2, col=1)
+    fig.update_yaxes(title_text="Count", row=2, col=2)
+    fig.update_yaxes(title_text="Frequency", row=3, col=1)
+    fig.update_yaxes(title_text="BPM", row=3, col=2)
+
+    # Update layout with modern styling
+    fig.update_layout(
+        title=dict(
+            text="Heart Health Dashboard",
+            x=0.5,
+            font=dict(size=28, color="#2d3748", family="Arial Black"),
+        ),
+        height=1200,
+        showlegend=True,
+        hovermode="closest",
+        template="plotly_white",
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Arial, sans-serif", size=12, color="#4a5568"),
+        legend=dict(
+            bgcolor="rgba(255,255,255,0.8)",
+            bordercolor="#e2e8f0",
+            borderwidth=1,
+            font=dict(size=11),
+        ),
+    )
+
+    return fig
+
+
 def _add_breadcrumb_navigation(html_content: str, current_template: str) -> str:
     """
     Add breadcrumb navigation to dashboard HTML.
@@ -589,6 +871,7 @@ def _add_breadcrumb_navigation(html_content: str, current_template: str) -> str:
     template_names = {
         "default": "Default Dashboard",
         "deep_sleep": "Deep Sleep Dashboard",
+        "heart_health": "Heart Health Dashboard",
     }
 
     # Build breadcrumb HTML
@@ -972,14 +1255,16 @@ def create_dashboard(
     csv_path: str,
     output_path: Optional[str] = None,
     template: str = "default",
+    base_dir: Optional[str] = None,
 ) -> str:
     """
-    Create an interactive HTML dashboard from sleep data CSV.
+    Create an interactive HTML dashboard from data CSV.
 
     Args:
-        csv_path: Path to input CSV file with sleep data.
+        csv_path: Path to input CSV file with data.
         output_path: Path for output HTML file. If None, defaults to `{template}_dashboard.html` in the `dashboards/` subdirectory.
-        template: Dashboard template to use. Available: 'default', 'deep_sleep'. Defaults to 'default'.
+        template: Dashboard template to use. Available: 'default', 'deep_sleep', 'heart_health'. Defaults to 'default'.
+        base_dir: Base directory for finding related CSV files (for templates that need multiple data types).
 
     Returns:
         Path to generated HTML dashboard file.
@@ -993,17 +1278,35 @@ def create_dashboard(
     if output_path is None:
         csv_file = Path(csv_path)
         # Always use exports/dashboards/ regardless of CSV location
-        # If CSV is in exports/data/, go up one level to exports/
-        if csv_file.parent.name == "data":
+        if base_dir:
+            dashboards_dir = Path(base_dir) / "dashboards"
+        elif csv_file.parent.name == "data":
             base_dir = csv_file.parent.parent
+            dashboards_dir = base_dir / "dashboards"
         else:
             base_dir = csv_file.parent
-        dashboards_dir = base_dir / "dashboards"
+            dashboards_dir = base_dir / "dashboards"
         dashboards_dir.mkdir(parents=True, exist_ok=True)
         output_path = str(dashboards_dir / f"{template}_dashboard.html")
 
-    logger.info(f"Loading sleep data from {csv_path}")
-    df = load_sleep_data(csv_path)
+    # Load appropriate data based on template
+    if template == "heart_health":
+        # Heart health dashboard needs heartrate data
+        if base_dir:
+            heartrate_path = Path(base_dir) / "data" / "heartrate_data.csv"
+        else:
+            heartrate_path = Path(csv_path).parent / "heartrate_data.csv"
+
+        if heartrate_path.exists():
+            logger.info(f"Loading heart rate data from {heartrate_path}")
+            df = load_heartrate_data(str(heartrate_path))
+        else:
+            logger.warning(f"Heart rate data not found at {heartrate_path}, using sleep data")
+            df = load_sleep_data(csv_path)
+    else:
+        # Sleep-based dashboards
+        logger.info(f"Loading sleep data from {csv_path}")
+        df = load_sleep_data(csv_path)
 
     if len(df) == 0:
         logger.warning("No data to visualize")
@@ -1032,20 +1335,41 @@ def create_dashboard(
     return output_path
 
 
-def create_all_dashboards(csv_path: str) -> list[str]:
+def create_all_dashboards(base_dir: str = "exports/data") -> list[str]:
     """
     Create all available dashboard templates.
 
     Args:
-        csv_path: Path to input CSV file with sleep data.
+        base_dir: Base directory containing CSV data files.
 
     Returns:
         List of paths to generated HTML dashboard files.
     """
     generated_paths = []
+    base_path = Path(base_dir)
+
+    # Find sleep data CSV (required for most dashboards)
+    sleep_csv = base_path / "sleep_data.csv"
+    if not sleep_csv.exists():
+        logger.warning(f"Sleep data not found at {sleep_csv}, skipping dashboards")
+        return generated_paths
+
     for template_name in TEMPLATES.keys():
         try:
-            path = create_dashboard(csv_path, template=template_name)
+            if template_name == "heart_health":
+                # Heart health needs heartrate data
+                path = create_dashboard(
+                    str(sleep_csv),
+                    template=template_name,
+                    base_dir=str(base_path.parent) if base_path.name == "data" else str(base_path),
+                )
+            else:
+                # Sleep-based dashboards
+                path = create_dashboard(
+                    str(sleep_csv),
+                    template=template_name,
+                    base_dir=str(base_path.parent) if base_path.name == "data" else str(base_path),
+                )
             generated_paths.append(path)
         except Exception as e:
             logger.error(f"Failed to generate {template_name} dashboard: {e}")
